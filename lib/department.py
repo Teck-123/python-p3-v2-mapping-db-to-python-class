@@ -3,6 +3,8 @@ from __init__ import CURSOR, CONN
 
 class Department:
 
+    all = {}
+
     def __init__(self, name, location, id=None):
         self.id = id
         self.name = name
@@ -45,6 +47,7 @@ class Department:
         CONN.commit()
 
         self.id = CURSOR.lastrowid
+        Department.all[self.id] = self
 
     @classmethod
     def create(cls, name, location):
@@ -62,6 +65,7 @@ class Department:
         """
         CURSOR.execute(sql, (self.name, self.location, self.id))
         CONN.commit()
+        Department.all[self.id] = self
 
     def delete(self):
         """Delete the table row corresponding to the current Department instance"""
@@ -72,3 +76,45 @@ class Department:
 
         CURSOR.execute(sql, (self.id,))
         CONN.commit()
+        if self.id in Department.all:
+            del Department.all[self.id]
+        self.id = None
+
+    @classmethod
+    def instance_from_db(cls, row):
+        """Take a table row and returns a Department instance."""
+        if row is None:
+            return None
+        id, name, location = row
+        department = cls(name, location, id)
+        cls.all[id] = department
+        return department
+
+    @classmethod
+    def get_all(cls):
+        """Return a list of Department instances for every row in the db."""
+        sql = """
+            SELECT * FROM departments
+        """
+        rows = CURSOR.execute(sql).fetchall()
+        return [cls.instance_from_db(row) for row in rows]
+
+    @classmethod
+    def find_by_id(cls, id):
+        """Return a Department instance corresponding to the db row retrieved by id."""
+        if id in cls.all:
+            return cls.all[id]
+        sql = """
+            SELECT * FROM departments WHERE id = ?
+        """
+        row = CURSOR.execute(sql, (id,)).fetchone()
+        return cls.instance_from_db(row)
+
+    @classmethod
+    def find_by_name(cls, name):
+        """Return a Department instance corresponding to the db row retrieved by name."""
+        sql = """
+            SELECT * FROM departments WHERE name = ?
+        """
+        row = CURSOR.execute(sql, (name,)).fetchone()
+        return cls.instance_from_db(row)
